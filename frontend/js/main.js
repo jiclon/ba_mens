@@ -1,23 +1,18 @@
 /* ============================================================
    BA MENS — main.js
-   Товары пока лежат прямо здесь. Когда будет готов бэкенд —
-   массив PRODUCTS заменяется на fetch(`${API_URL}/products`).
+   Все данные каталога приходят с бэкенда: GET {API_URL}/products.
+   В файле не осталось ни одного товара — только адрес API.
    ============================================================ */
 
 (() => {
   'use strict';
 
-  /* ── Данные (временно, до подключения API) ───────────────── */
-  const PRODUCTS = [
-    { brand: 'Nike',           name: 'Tech Tracksuit',        price: 24900, image: 'images/p-nike.jpg',     size: 'M — XL' },
-    { brand: 'New Balance',    name: '1906R Grey Green',      price: 24500, image: 'images/p-nb-green.jpg', size: '39 — 45' },
-    { brand: 'Tommy Hilfiger', name: 'Костюм Half-Zip',       price: 16500, image: 'images/p-tommy.jpg',    size: 'M — XL' },
-    { brand: 'Stüssy',         name: 'Футболка Basic',        price: 14500, image: 'images/p-stussy.jpg',   size: 'S — XXL' },
-    { brand: 'New Balance',    name: '860v2 Black Gold',      price: 24500, image: 'images/p-nb-black.jpg', size: '44 — 45' },
-    { brand: 'Reebok',         name: 'Футболка Sport',        price: 13500, image: 'images/p-reebok.jpg',   size: 'S — XXL' },
-    { brand: 'Nomads',         name: 'Футболка Qazaqstan',    price: 13500, image: 'images/p-nomads.jpg',   size: 'S — XXL' },
-    { brand: 'Givenchy',       name: 'Gentleman Parfum',      price: 12950, old: 18500, image: 'images/p-givenchy.jpg', size: '100 мл' }
-  ];
+  /* ── Адрес бэкенда ───────────────────────────────────────── */
+  /* Локально — твой uvicorn. После деплоя заменить на боевой адрес. */
+  const API_URL = 'http://127.0.0.1:8000';
+
+  /* Заполнится после ответа сервера */
+  let PRODUCTS = [];
 
   const BRANDS = ['Nike', 'Tommy Hilfiger', 'New Balance', 'Reebok', 'Stüssy', 'Creed', 'Dior', 'Tom Ford', 'Chanel', 'Givenchy'];
 
@@ -26,16 +21,64 @@
 
   const money = (n) => n.toLocaleString('ru-RU') + ' ₸';
 
+  /* ── Загрузка каталога с сервера ─────────────────────────── */
+  async function loadProducts() {
+    const grid = $('#grid');
+    if (grid) grid.innerHTML = '<p class="grid__state">Загружаем каталог…</p>';
+
+    try {
+      const res = await fetch(`${API_URL}/products`);
+      /* fetch не считает 404 и 500 ошибкой — проверяем статус сами */
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+      /* Показываем только то, что есть в наличии */
+      PRODUCTS = data.filter((p) => p.in_stock);
+
+      if (!PRODUCTS.length) {
+        if (grid) grid.innerHTML = '<p class="grid__state">Пока пусто — скоро завезём</p>';
+        return;
+      }
+
+      renderGrid();
+      /* Карточки появились после старта анимаций — подключаем их вручную */
+      revealCards();
+    } catch (err) {
+      console.error('Каталог не загрузился:', err);
+      if (grid) grid.innerHTML = '<p class="grid__state">Каталог временно недоступен</p>';
+    }
+  }
+
+  /* Показывает карточки: через GSAP, либо сразу если его нет */
+  function revealCards() {
+    const cards = $$('#grid [data-reveal]');
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (reduced || typeof gsap === 'undefined') {
+      cards.forEach((el) => { el.style.opacity = 1; el.style.transform = 'none'; });
+      return;
+    }
+
+    cards.forEach((el) => {
+      gsap.to(el, {
+        opacity: 1, y: 0, duration: 0.95, ease: 'power3.out',
+        scrollTrigger: { trigger: el, start: 'top 92%', once: true }
+      });
+    });
+
+    if (typeof ScrollTrigger !== 'undefined') ScrollTrigger.refresh();
+  }
+
   /* ── Каталог ─────────────────────────────────────────────── */
   function renderGrid() {
     const grid = $('#grid');
     if (!grid) return;
 
     grid.innerHTML = PRODUCTS.map((p) => `
-      <article class="card" data-reveal>
+      <a class="card" href="product.html?id=${p.id}" data-reveal>
         <div class="card__frame">
-          <img src="${p.image}" alt="${p.brand} ${p.name}" loading="lazy" />
-          <div class="tag ${p.old ? 'tag--sale' : ''}">
+          <img src="${p.image || 'images/p-nike.jpg'}" alt="${p.brand} ${p.name}" loading="lazy" />
+          <div class="tag ${p.old_price ? 'tag--sale' : ''}">
             <div class="tag__body">${money(p.price)}</div>
           </div>
         </div>
@@ -43,12 +86,12 @@
           <p class="card__brand">${p.brand}</p>
           <h3 class="card__name">${p.name}</h3>
           <div class="card__foot">
-            ${p.old ? `<span class="card__old">${money(p.old)}</span>` : ''}
+            ${p.old_price ? `<span class="card__old">${money(p.old_price)}</span>` : ''}
             <span class="card__price">${money(p.price)}</span>
-            <span class="card__size">${p.size}</span>
+            <span class="card__size">${p.size || ''}</span>
           </div>
         </div>
-      </article>`).join('');
+      </a>`).join('');
   }
 
   /* ── Бегущая строка брендов ──────────────────────────────── */
@@ -175,7 +218,7 @@
   /* ── Старт ───────────────────────────────────────────────── */
   document.addEventListener('DOMContentLoaded', () => {
     renderTicker();
-    renderGrid();
+    loadProducts();
     initMenu();
     initHeader();
     initSmoothScroll();
