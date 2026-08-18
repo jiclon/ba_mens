@@ -6,6 +6,10 @@ from schemas import OrderCreate, OrderRead
 
 router = APIRouter()
 
+@router.get("/orders", response_model=list[OrderRead])
+def get_order(db: Session = Depends(get_db)):
+    return db.query(Order).order_by(Order.id.desc()).all()
+
 @router.post("/orders", response_model=OrderRead, status_code=201)
 def create_order(order: OrderCreate, db: Session = Depends(get_db)):
     db_product = db.query(Product).filter(Product.id == order.product_id).first()
