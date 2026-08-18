@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from datetime import datetime
 
 class ProductRead(BaseModel):
     id: int
@@ -12,3 +13,24 @@ class ProductRead(BaseModel):
     category: str | None
 
     model_config =  {"from_attributes": True}
+
+class OrderCreate(BaseModel):
+    product_id: int
+    quantity: int
+    customer_name: str
+    phone: str
+    delivery_type: str
+    address: str | None
+    model_config = {"from_attributes": True}
+
+class OrderRead(BaseModel):
+    id: int
+    status: str
+    created_at: datetime
+    product_id: int
+    quantity: int
+    customer_name: str
+    phone: str
+    delivery_type: str
+    address: str | None
+    model_config = {"from_attributes": True}
