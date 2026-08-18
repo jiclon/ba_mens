@@ -7,7 +7,8 @@
 (() => {
   'use strict';
 
-  const API_URL = 'http://127.0.0.1:8000';
+  const API_URL = 'https://ba-mens.onrender.com';
+
 
   const $  = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
