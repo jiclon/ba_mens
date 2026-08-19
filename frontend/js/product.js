@@ -1,14 +1,13 @@
 /* ============================================================
    BA MENS — product.js
-   Карточка одного товара. Какой именно — берётся из адреса:
-   product.html?id=3
+   Карточка одного товара + оформление заказа.
+   Какой товар — берётся из адреса: product.html?id=3
    ============================================================ */
 
 (() => {
   'use strict';
 
   const API_URL = 'https://ba-mens.onrender.com';
-
 
   const $  = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -18,9 +17,25 @@
   const CAT_LABEL = {
     clothing: 'Одежда',
     shoes:    'Обувь',
-    perfume:  'Парфюм',
-    watch:    'Часы'
+    perfume:  'Парфюм'
   };
+
+  /* Размеры зависят от категории.
+     У парфюма размера нет — в заказ уйдёт null. */
+  const SIZES = {
+    clothing: ['S', 'M', 'L', 'XL', 'XXL'],
+    shoes:    ['39', '40', '41', '42', '43', '44', '45']
+  };
+
+  const PAYMENTS = [
+    { v: 'kaspi',       label: 'Kaspi QR' },
+    { v: 'card',        label: 'Картой' },
+    { v: 'cash',        label: 'Наличными' },
+    { v: 'installment', label: 'Рассрочка 0-0-12' }
+  ];
+
+  /* Текущий товар — нужен форме */
+  let current = null;
 
   /* ── Загрузка ────────────────────────────────────────────── */
   async function load() {
@@ -32,7 +47,6 @@
     }
 
     try {
-      /* Один товар — один запрос */
       const res = await fetch(`${API_URL}/products/${id}`);
 
       if (res.status === 404) {
@@ -42,9 +56,8 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const p = await res.json();
+      current = p;
 
-      /* Похожие грузим отдельно — они не критичны,
-         если запрос упадёт, страница всё равно покажется */
       let all = [];
       try {
         const listRes = await fetch(`${API_URL}/products`);
@@ -72,7 +85,6 @@
   function render(p, all) {
     document.title = `${p.brand} ${p.name} — BA MENS`;
 
-    /* Похожие: та же категория, но не этот товар */
     const similar = all
       .filter((x) => x.in_stock && x.category === p.category && x.id !== p.id)
       .slice(0, 4);
@@ -104,22 +116,24 @@
               </div>
 
               <dl class="prod__specs">
-                ${p.size ? `<div><dt>Размеры</dt><dd>${p.size}</dd></div>` : ''}
                 ${p.category ? `<div><dt>Категория</dt><dd>${CAT_LABEL[p.category] || p.category}</dd></div>` : ''}
+                ${SIZES[p.category] ? `<div><dt>Размеры</dt><dd>${SIZES[p.category].join(' · ')}</dd></div>` : ''}
                 <div><dt>Наличие</dt><dd>${p.in_stock ? 'Есть в магазине' : 'Под заказ'}</dd></div>
                 <div><dt>Оплата</dt><dd>Наличные, карта, Kaspi QR, рассрочка 0-0-12</dd></div>
               </dl>
 
               <div class="prod__cta">
-                <a href="https://instagram.com/ba_mens" target="_blank" rel="noopener" class="btn btn--solid">
-                  Заказать в Instagram
+                <button type="button" class="btn btn--solid" id="orderOpen">
+                  Оформить заказ
+                </button>
+                <a href="https://instagram.com/ba_mens" target="_blank" rel="noopener" class="btn btn--line">
+                  Написать в Instagram
                 </a>
-                <a href="catalog.html" class="btn btn--line">Смотреть каталог</a>
               </div>
 
               <p class="prod__note">
                 Товар можно померить в магазине: ТРЦ Рахмет, 3 этаж.
-                Доставка по Казахстану — обсудим в переписке.
+                Доставка по Казахстану — обсудим после заказа.
               </p>
             </div>
           </div>
@@ -139,9 +153,10 @@
         </div>
       </section>` : ''}
     `;
+
+    $('#orderOpen').addEventListener('click', openOrder);
   }
 
-  /* Карточка товара — ссылка на его страницу */
   function card(p) {
     return `
       <a class="card" href="product.html?id=${p.id}">
@@ -157,10 +172,353 @@
           <div class="card__foot">
             ${p.old_price ? `<span class="card__old">${money(p.old_price)}</span>` : ''}
             <span class="card__price">${money(p.price)}</span>
-            <span class="card__size">${p.size || ''}</span>
           </div>
         </div>
       </a>`;
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     ФОРМА ЗАКАЗА
+     ══════════════════════════════════════════════════════════ */
+
+  /* Состояние формы живёт здесь, а не в DOM */
+  const order = {
+    size: null,
+    quantity: 1,
+    delivery: 'pickup',
+    payment: 'kaspi'
+  };
+
+  function openOrder() {
+    const p = current;
+    if (!p) return;
+
+    order.size = null;
+    order.quantity = 1;
+    order.delivery = 'pickup';
+    order.payment = 'kaspi';
+
+    const sizes = SIZES[p.category] || null;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'ord';
+    wrap.id = 'ord';
+    wrap.innerHTML = `
+      <div class="ord__veil" data-close></div>
+
+      <div class="ord__sheet" role="dialog" aria-modal="true" aria-labelledby="ordTitle">
+        <button type="button" class="ord__x" data-close aria-label="Закрыть">×</button>
+
+        <div class="ord__head">
+          <p class="ord__tag">Заказ</p>
+          <h2 class="ord__title" id="ordTitle">${p.brand} ${p.name}</h2>
+        </div>
+
+        <div class="ord__body" id="ordBody">
+
+          <div class="ord__item">
+            <img class="ord__thumb" src="${p.image || 'images/p-nike.jpg'}" alt="" />
+            <div class="ord__itemtx">
+              <p class="ord__itembrand">${p.brand}</p>
+              <p class="ord__itemname">${p.name}</p>
+            </div>
+            <span class="ord__itemprice">${money(p.price)}</span>
+          </div>
+
+          ${sizes ? `
+          <div class="ord__field">
+            <span class="ord__label">Размер</span>
+            <div class="ord__chips" id="ordSizes">
+              ${sizes.map((s) => `<button type="button" class="ord__chip" data-size="${s}">${s}</button>`).join('')}
+            </div>
+            <p class="ord__err" id="errSize"></p>
+          </div>` : ''}
+
+          <div class="ord__field">
+            <span class="ord__label">Количество</span>
+            <div class="ord__step">
+              <button type="button" class="ord__stepbtn" id="qtyMinus" aria-label="Меньше">−</button>
+              <span class="ord__stepval" id="qtyVal">1</span>
+              <button type="button" class="ord__stepbtn" id="qtyPlus" aria-label="Больше">+</button>
+            </div>
+          </div>
+
+          <div class="ord__field">
+            <label class="ord__label" for="ordName">Как вас зовут</label>
+            <input class="ord__input" id="ordName" type="text" placeholder="Имя" autocomplete="name" />
+            <p class="ord__err" id="errName"></p>
+          </div>
+
+          <div class="ord__field">
+            <label class="ord__label" for="ordPhone">Телефон</label>
+            <input class="ord__input" id="ordPhone" type="tel" placeholder="+7 (___) ___-__-__" autocomplete="tel" inputmode="tel" />
+            <p class="ord__hint">Позвоним, чтобы подтвердить заказ</p>
+            <p class="ord__err" id="errPhone"></p>
+          </div>
+
+          <div class="ord__field">
+            <span class="ord__label">Как получите</span>
+            <div class="ord__chips" id="ordDelivery">
+              <button type="button" class="ord__chip is-on" data-delivery="pickup">Заберу сам</button>
+              <button type="button" class="ord__chip" data-delivery="delivery">Доставка</button>
+            </div>
+          </div>
+
+          <div class="ord__field" id="ordAddrField" hidden>
+            <label class="ord__label" for="ordAddr">Куда привезти</label>
+            <input class="ord__input" id="ordAddr" type="text" placeholder="Город, улица, дом, квартира" />
+            <p class="ord__err" id="errAddr"></p>
+          </div>
+
+          <div class="ord__field">
+            <span class="ord__label">Чем оплатите</span>
+            <div class="ord__chips" id="ordPay">
+              ${PAYMENTS.map((x, i) => `
+                <button type="button" class="ord__chip ${i === 0 ? 'is-on' : ''}" data-pay="${x.v}">${x.label}</button>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="ord__total">
+            <span>Итого</span>
+            <strong id="ordTotal">${money(p.price)}</strong>
+          </div>
+
+          <p class="ord__err ord__err--big" id="errAll"></p>
+
+          <button type="button" class="btn btn--solid ord__send" id="ordSend">
+            Отправить заказ
+          </button>
+
+          <p class="ord__fine">
+            Оплата при получении. Сначала подтвердим наличие по телефону.
+          </p>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(wrap);
+    document.body.classList.add('is-locked');
+    requestAnimationFrame(() => wrap.classList.add('is-on'));
+
+    bindOrder(p, sizes);
+  }
+
+  function closeOrder() {
+    const wrap = $('#ord');
+    if (!wrap) return;
+    document.removeEventListener('keydown', onEsc);
+    wrap.classList.remove('is-on');
+    document.body.classList.remove('is-locked');
+    setTimeout(() => wrap.remove(), 220);
+  }
+
+  function onEsc(e) {
+    if (e.key === 'Escape') closeOrder();
+  }
+
+  function bindOrder(p, sizes) {
+    const wrap = $('#ord');
+
+    /* Закрытие */
+    $$('[data-close]', wrap).forEach((el) => el.addEventListener('click', closeOrder));
+    document.addEventListener('keydown', onEsc);
+
+    /* Размер */
+    if (sizes) {
+      $$('#ordSizes .ord__chip', wrap).forEach((b) => {
+        b.addEventListener('click', () => {
+          $$('#ordSizes .ord__chip', wrap).forEach((x) => x.classList.remove('is-on'));
+          b.classList.add('is-on');
+          order.size = b.dataset.size;
+          $('#errSize', wrap).textContent = '';
+        });
+      });
+    }
+
+    /* Количество */
+    const qtyVal = $('#qtyVal', wrap);
+    const redrawQty = () => {
+      qtyVal.textContent = order.quantity;
+      $('#ordTotal', wrap).textContent = money(p.price * order.quantity);
+    };
+    $('#qtyMinus', wrap).addEventListener('click', () => {
+      if (order.quantity > 1) { order.quantity--; redrawQty(); }
+    });
+    $('#qtyPlus', wrap).addEventListener('click', () => {
+      if (order.quantity < 20) { order.quantity++; redrawQty(); }
+    });
+
+    /* Доставка */
+    $$('#ordDelivery .ord__chip', wrap).forEach((b) => {
+      b.addEventListener('click', () => {
+        $$('#ordDelivery .ord__chip', wrap).forEach((x) => x.classList.remove('is-on'));
+        b.classList.add('is-on');
+        order.delivery = b.dataset.delivery;
+        $('#ordAddrField', wrap).hidden = order.delivery !== 'delivery';
+      });
+    });
+
+    /* Оплата */
+    $$('#ordPay .ord__chip', wrap).forEach((b) => {
+      b.addEventListener('click', () => {
+        $$('#ordPay .ord__chip', wrap).forEach((x) => x.classList.remove('is-on'));
+        b.classList.add('is-on');
+        order.payment = b.dataset.pay;
+      });
+    });
+
+    /* Телефон — форматируем на лету */
+    const phone = $('#ordPhone', wrap);
+    phone.addEventListener('input', () => {
+      phone.value = maskPhone(phone.value);
+      $('#errPhone', wrap).textContent = '';
+    });
+
+    $('#ordName', wrap).addEventListener('input', () => {
+      $('#errName', wrap).textContent = '';
+    });
+
+    /* Отправка */
+    $('#ordSend', wrap).addEventListener('click', () => send(p, sizes));
+  }
+
+  /* Приводим ввод к виду +7 (777) 123-45-67 */
+  function maskPhone(raw) {
+    let d = String(raw).replace(/\D/g, '');
+    if (d.startsWith('8')) d = '7' + d.slice(1);
+    if (!d.startsWith('7')) d = '7' + d;
+    d = d.slice(0, 11);
+
+    let out = '+7';
+    if (d.length > 1) out += ' (' + d.slice(1, 4);
+    if (d.length >= 5) out += ') ' + d.slice(4, 7);
+    if (d.length >= 8) out += '-' + d.slice(7, 9);
+    if (d.length >= 10) out += '-' + d.slice(9, 11);
+    return out;
+  }
+
+  const digits = (s) => String(s).replace(/\D/g, '');
+
+  /* ── Отправка ────────────────────────────────────────────── */
+  async function send(p, sizes) {
+    const wrap = $('#ord');
+    const name  = $('#ordName', wrap).value.trim();
+    const phone = $('#ordPhone', wrap).value;
+    const addrEl = $('#ordAddr', wrap);
+    const addr  = addrEl ? addrEl.value.trim() : '';
+
+    /* Чистим прошлые ошибки */
+    $$('.ord__err', wrap).forEach((el) => (el.textContent = ''));
+
+    let bad = false;
+
+    if (sizes && !order.size) {
+      $('#errSize', wrap).textContent = 'Выберите размер';
+      bad = true;
+    }
+    if (name.length < 2) {
+      $('#errName', wrap).textContent = 'Напишите имя';
+      bad = true;
+    }
+    if (digits(phone).length !== 11) {
+      $('#errPhone', wrap).textContent = 'Номер из 11 цифр, начиная с +7';
+      bad = true;
+    }
+    if (order.delivery === 'delivery' && addr.length < 5) {
+      $('#errAddr', wrap).textContent = 'Укажите адрес доставки';
+      bad = true;
+    }
+
+    if (bad) return;
+
+    const btn = $('#ordSend', wrap);
+    btn.disabled = true;
+    btn.textContent = 'Отправляем…';
+
+    const payload = {
+      customer_name: name,
+      phone: digits(phone),
+      delivery_type: order.delivery,
+      address: order.delivery === 'delivery' ? addr : null,
+      payment_type: order.payment,
+      items: [
+        {
+          product_id: p.id,
+          quantity: order.quantity,
+          size: order.size
+        }
+      ]
+    };
+
+    try {
+      const res = await fetch(`${API_URL}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        let msg = 'Заказ не отправился. Попробуйте ещё раз';
+        try {
+          const err = await res.json();
+          if (err.detail && typeof err.detail === 'string') msg = err.detail;
+        } catch (_) { /* тело не JSON — оставим общий текст */ }
+        throw new Error(msg);
+      }
+
+      const created = await res.json();
+      done(created, p);
+    } catch (err) {
+      console.error('Заказ не ушёл:', err);
+      $('#errAll', wrap).textContent = err.message;
+      btn.disabled = false;
+      btn.textContent = 'Отправить заказ';
+    }
+  }
+
+  /* ── Готово ──────────────────────────────────────────────── */
+  function done(o, p) {
+    const wrap = $('#ord');
+    const item = o.items[0];
+
+    $('.ord__head', wrap).innerHTML = `
+      <p class="ord__tag">Принято</p>
+      <h2 class="ord__title">Заказ №${o.id}</h2>
+    `;
+
+    $('#ordBody', wrap).innerHTML = `
+      <div class="ord__ok">
+        <div class="ord__okmark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none">
+            <path d="M12 25l8 8 16-18" stroke="currentColor" stroke-width="3"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+
+        <p class="ord__oktx">
+          Заказ на ${p.brand} ${p.name}${item.size ? `, размер ${item.size}` : ''} у нас.
+          Позвоним на ${maskPhone(o.phone)}, чтобы подтвердить наличие
+          и договориться о получении.
+        </p>
+
+        <dl class="ord__okgrid">
+          <div><dt>Номер</dt><dd>№${o.id}</dd></div>
+          <div><dt>Получение</dt><dd>${o.delivery_type === 'delivery' ? 'Доставка' : 'Самовывоз'}</dd></div>
+          <div><dt>Оплата</dt><dd>${(PAYMENTS.find((x) => x.v === o.payment_type) || {}).label || o.payment_type}</dd></div>
+          <div><dt>Сумма</dt><dd>${money(p.price * item.quantity)}</dd></div>
+        </dl>
+
+        <p class="ord__fine">Запишите номер заказа — по нему быстрее вас найдём.</p>
+
+        <div class="ord__okcta">
+          <a href="catalog.html" class="btn btn--solid">Смотреть каталог</a>
+          <button type="button" class="btn btn--line" data-close>Закрыть</button>
+        </div>
+      </div>
+    `;
+
+    $$('[data-close]', wrap).forEach((el) => el.addEventListener('click', closeOrder));
   }
 
   /* ── Меню ────────────────────────────────────────────────── */
@@ -186,7 +544,9 @@
     });
 
     $$('.drawer__nav a').forEach((a) => a.addEventListener('click', close));
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !$('#ord')) close();
+    });
   }
 
   /* ── Плавный скролл ──────────────────────────────────────── */
