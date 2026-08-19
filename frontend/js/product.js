@@ -265,8 +265,17 @@
           </div>
 
           <div class="ord__field" id="ordAddrField" hidden>
-            <label class="ord__label" for="ordAddr">Куда привезти</label>
-            <input class="ord__input" id="ordAddr" type="text" placeholder="Город, улица, дом, квартира" />
+            <span class="ord__label">Куда привезти</span>
+
+            <div class="ord__addr">
+              <input class="ord__input" id="ordCity" type="text"
+                     placeholder="Город" autocomplete="address-level2" maxlength="30" />
+              <input class="ord__input" id="ordStreet" type="text"
+                     placeholder="Улица и дом" autocomplete="address-line1" maxlength="40" />
+              <input class="ord__input" id="ordFlat" type="text"
+                     placeholder="Квартира, подъезд — если есть" autocomplete="address-line2" maxlength="20" />
+            </div>
+
             <p class="ord__err" id="errAddr"></p>
           </div>
 
@@ -379,6 +388,14 @@
       $('#errName', wrap).textContent = '';
     });
 
+    /* Три поля адреса — любое очищает общую ошибку */
+    ['#ordCity', '#ordStreet', '#ordFlat'].forEach((id) => {
+      const el = $(id, wrap);
+      if (el) el.addEventListener('input', () => {
+        $('#errAddr', wrap).textContent = '';
+      });
+    });
+
     /* Отправка */
     $('#ordSend', wrap).addEventListener('click', () => send(p, sizes));
   }
@@ -405,8 +422,17 @@
     const wrap = $('#ord');
     const name  = $('#ordName', wrap).value.trim();
     const phone = $('#ordPhone', wrap).value;
-    const addrEl = $('#ordAddr', wrap);
-    const addr  = addrEl ? addrEl.value.trim() : '';
+    const val = (id) => {
+      const el = $(id, wrap);
+      return el ? el.value.trim() : '';
+    };
+
+    const city   = val('#ordCity');
+    const street = val('#ordStreet');
+    const flat   = val('#ordFlat');
+
+    /* Склеиваем три поля в одну строку — в базе колонка одна */
+    const addr = [city, street, flat].filter(Boolean).join(', ').slice(0, 80);
 
     /* Чистим прошлые ошибки */
     $$('.ord__err', wrap).forEach((el) => (el.textContent = ''));
@@ -425,9 +451,14 @@
       $('#errPhone', wrap).textContent = 'Номер из 11 цифр, начиная с +7';
       bad = true;
     }
-    if (order.delivery === 'delivery' && addr.length < 5) {
-      $('#errAddr', wrap).textContent = 'Укажите адрес доставки';
-      bad = true;
+    if (order.delivery === 'delivery') {
+      if (!city) {
+        $('#errAddr', wrap).textContent = 'Укажите город';
+        bad = true;
+      } else if (street.length < 4) {
+        $('#errAddr', wrap).textContent = 'Укажите улицу и номер дома';
+        bad = true;
+      }
     }
 
     if (bad) return;
