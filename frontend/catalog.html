@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Каталог — BA MENS, Петропавловск</title>
-<meta name="description" content="Каталог BA MENS: мужская одежда, обувь, парфюм и часы. Оригинальные бренды, ТРЦ Рахмет, 3 этаж. Рассрочка Kaspi 0-0-12." />
+<meta name="description" content="Каталог BA MENS: мужская одежда, обувь и парфюм. Оригинальные бренды, ТРЦ Рахмет, 3 этаж. Рассрочка Kaspi 0-0-12." />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -31,8 +31,9 @@
 
     <div class="head__side">
       <a href="https://instagram.com/ba_mens" target="_blank" rel="noopener" class="head__ig">Instagram</a>
-      <button class="burger" id="burger" aria-label="Меню" aria-expanded="false">
-        <i></i><i></i>
+      <button class="burger" id="burger" aria-label="Открыть меню" aria-expanded="false">
+        <span class="burger__lines"><i></i><i></i></span>
+        <span class="burger__txt"></span>
       </button>
     </div>
   </div>
@@ -80,22 +81,27 @@
           <button class="chip" data-cat="clothing">Одежда</button>
           <button class="chip" data-cat="shoes">Обувь</button>
           <button class="chip" data-cat="perfume">Парфюм</button>
-          <button class="chip" data-cat="watch">Часы</button>
         </div>
 
         <div class="filters__line">
           <!-- Бренды подставятся из данных -->
           <div class="filters__row filters__row--brands" id="brandRow"></div>
 
-          <label class="sortbox">
-            <span>Сортировка</span>
-            <select id="sortBy">
-              <option value="default">По умолчанию</option>
-              <option value="cheap">Сначала дешёвые</option>
-              <option value="rich">Сначала дорогие</option>
-              <option value="brand">По бренду</option>
-            </select>
-          </label>
+          <!-- Сортировка: своя, вместо системного select -->
+          <div class="sortbox" id="sortBox">
+            <button class="sortbox__btn" id="sortBtn" aria-haspopup="listbox" aria-expanded="false">
+              <span class="sortbox__label">Сортировка</span>
+              <span class="sortbox__val" id="sortVal">По умолчанию</span>
+              <span class="sortbox__arrow" aria-hidden="true"></span>
+            </button>
+
+            <ul class="sortbox__menu" id="sortMenu" role="listbox" aria-label="Сортировка">
+              <li><button class="sortbox__opt is-on" role="option" aria-selected="true"  data-sort="default">По умолчанию</button></li>
+              <li><button class="sortbox__opt"       role="option" aria-selected="false" data-sort="cheap">Сначала дешёвые</button></li>
+              <li><button class="sortbox__opt"       role="option" aria-selected="false" data-sort="rich">Сначала дорогие</button></li>
+              <li><button class="sortbox__opt"       role="option" aria-selected="false" data-sort="brand">По бренду</button></li>
+            </ul>
+          </div>
         </div>
       </div>
 

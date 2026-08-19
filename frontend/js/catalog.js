@@ -24,8 +24,7 @@
   const CAT_LABEL = {
     clothing: 'Одежда',
     shoes:    'Обувь',
-    perfume:  'Парфюм',
-    watch:    'Часы'
+    perfume:  'Парфюм'
   };
 
   /* ── Загрузка ────────────────────────────────────────────── */
@@ -146,11 +145,50 @@
       $$('#brandRow .chip').forEach((b) => b.classList.toggle('is-on', b === btn));
       apply();
     });
+  }
 
-    /* Сортировка */
-    $('#sortBy').addEventListener('change', (e) => {
-      state.sort = e.target.value;
+  /* ── Своя сортировка вместо системного select ────────────── */
+  function initSort() {
+    const box  = $('#sortBox');
+    const btn  = $('#sortBtn');
+    const menu = $('#sortMenu');
+    const val  = $('#sortVal');
+    if (!box || !btn || !menu) return;
+
+    const close = () => {
+      box.classList.remove('is-open');
+      btn.setAttribute('aria-expanded', 'false');
+    };
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = box.classList.toggle('is-open');
+      btn.setAttribute('aria-expanded', String(open));
+    });
+
+    menu.addEventListener('click', (e) => {
+      const opt = e.target.closest('[data-sort]');
+      if (!opt) return;
+
+      state.sort = opt.dataset.sort;
+      val.textContent = opt.textContent;
+
+      $$('.sortbox__opt', menu).forEach((o) => {
+        const on = o === opt;
+        o.classList.toggle('is-on', on);
+        o.setAttribute('aria-selected', String(on));
+      });
+
+      close();
       apply();
+    });
+
+    /* Закрываем по клику мимо и по Escape */
+    document.addEventListener('click', (e) => {
+      if (!box.contains(e.target)) close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') close();
     });
   }
 
@@ -201,6 +239,7 @@
 
     initMenu();
     initFilters();
+    initSort();
     initSmoothScroll();
     load();
   });
