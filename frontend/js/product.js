@@ -122,14 +122,38 @@
                 <div><dt>Оплата</dt><dd>Наличные, карта, Kaspi QR, рассрочка 0-0-12</dd></div>
               </dl>
 
-              <div class="prod__cta">
-                <button type="button" class="btn btn--solid" id="orderOpen">
-                  Оформить заказ
-                </button>
-                <a href="https://instagram.com/ba_mens" target="_blank" rel="noopener" class="btn btn--line">
-                  Написать в Instagram
-                </a>
+              ${SIZES[p.category] ? `
+              <div class="pick">
+                <span class="pick__label">Размер</span>
+                <div class="pick__chips" id="pickSizes">
+                  ${SIZES[p.category].map((s) => `
+                    <button type="button" class="pick__chip" data-size="${s}">${s}</button>
+                  `).join('')}
+                </div>
+                <p class="pick__err" id="pickErr"></p>
+              </div>` : ''}
+
+              <div class="pick">
+                <span class="pick__label">Количество</span>
+                <div class="pick__step">
+                  <button type="button" class="pick__stepbtn" id="pickMinus" aria-label="Меньше">−</button>
+                  <span class="pick__val" id="pickVal">1</span>
+                  <button type="button" class="pick__stepbtn" id="pickPlus" aria-label="Больше">+</button>
+                </div>
               </div>
+
+              <div class="prod__cta">
+                <button type="button" class="btn btn--solid" id="toCart">
+                  В корзину
+                </button>
+                <button type="button" class="btn btn--line" id="orderOpen">
+                  Купить сразу
+                </button>
+              </div>
+
+              <p class="prod__added" id="addedNote" hidden>
+                Товар в корзине · <a href="cart.html">перейти к оформлению</a>
+              </p>
 
               <p class="prod__note">
                 Товар можно померить в магазине: ТРЦ Рахмет, 3 этаж.
@@ -154,7 +178,74 @@
       </section>` : ''}
     `;
 
-    $('#orderOpen').addEventListener('click', openOrder);
+    initPick(p);
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     ВЫБОР НА СТРАНИЦЕ ТОВАРА
+     ══════════════════════════════════════════════════════════ */
+
+  /* Что выбрано прямо сейчас — общее для корзины и быстрой покупки */
+  const pick = { size: null, quantity: 1 };
+
+  function initPick(p) {
+    const sizes = SIZES[p.category] || null;
+
+    pick.size = null;
+    pick.quantity = 1;
+
+    /* Размер */
+    if (sizes) {
+      $$('#pickSizes .pick__chip').forEach((b) => {
+        b.addEventListener('click', () => {
+          $$('#pickSizes .pick__chip').forEach((x) => x.classList.remove('is-on'));
+          b.classList.add('is-on');
+          pick.size = b.dataset.size;
+          $('#pickErr').textContent = '';
+        });
+      });
+    }
+
+    /* Количество */
+    const val = $('#pickVal');
+    $('#pickMinus').addEventListener('click', () => {
+      if (pick.quantity > 1) { pick.quantity--; val.textContent = pick.quantity; }
+    });
+    $('#pickPlus').addEventListener('click', () => {
+      if (pick.quantity < 20) { pick.quantity++; val.textContent = pick.quantity; }
+    });
+
+    /* В корзину */
+    $('#toCart').addEventListener('click', () => {
+      if (sizes && !pick.size) {
+        $('#pickErr').textContent = 'Сначала выберите размер';
+        return;
+      }
+
+      Cart.add({
+        product_id: p.id,
+        brand: p.brand,
+        name: p.name,
+        price: p.price,
+        image: p.image,
+        size: pick.size,
+        quantity: pick.quantity
+      });
+
+      const btn = $('#toCart');
+      btn.textContent = 'Добавлено';
+      $('#addedNote').hidden = false;
+      setTimeout(() => { btn.textContent = 'В корзину'; }, 1800);
+    });
+
+    /* Быстрая покупка — открывает форму на один товар */
+    $('#orderOpen').addEventListener('click', () => {
+      if (sizes && !pick.size) {
+        $('#pickErr').textContent = 'Сначала выберите размер';
+        return;
+      }
+      openOrder();
+    });
   }
 
   function card(p) {
@@ -193,12 +284,14 @@
     const p = current;
     if (!p) return;
 
-    order.size = null;
-    order.quantity = 1;
+    /* Размер и количество уже выбраны на странице — переносим их */
+    order.size = pick.size;
+    order.quantity = pick.quantity;
     order.delivery = 'pickup';
     order.payment = 'kaspi';
 
-    const sizes = SIZES[p.category] || null;
+    /* В форме размер не переспрашиваем, только показываем */
+    const sizes = null;
 
     const wrap = document.createElement('div');
     wrap.className = 'ord';
@@ -221,6 +314,7 @@
             <div class="ord__itemtx">
               <p class="ord__itembrand">${p.brand}</p>
               <p class="ord__itemname">${p.name}</p>
+              ${order.size ? `<p class="ord__itemsize">Размер ${order.size}</p>` : ''}
             </div>
             <span class="ord__itemprice">${money(p.price)}</span>
           </div>
@@ -238,7 +332,7 @@
             <span class="ord__label">Количество</span>
             <div class="ord__step">
               <button type="button" class="ord__stepbtn" id="qtyMinus" aria-label="Меньше">−</button>
-              <span class="ord__stepval" id="qtyVal">1</span>
+              <span class="ord__stepval" id="qtyVal">${order.quantity}</span>
               <button type="button" class="ord__stepbtn" id="qtyPlus" aria-label="Больше">+</button>
             </div>
           </div>
@@ -290,7 +384,7 @@
 
           <div class="ord__total">
             <span>Итого</span>
-            <strong id="ordTotal">${money(p.price)}</strong>
+            <strong id="ordTotal">${money(p.price * order.quantity)}</strong>
           </div>
 
           <p class="ord__err ord__err--big" id="errAll"></p>
