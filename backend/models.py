@@ -37,3 +37,13 @@ class OrderItem(Base):
     quantity: Mapped[int] = mapped_column()
     size: Mapped[str | None] = mapped_column(String(50))
     order: Mapped["Order"] = relationship(back_populates="items")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)  
+    username: Mapped[str] = mapped_column(String(40), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now)
+    

@@ -45,3 +45,15 @@ class OrderRead(BaseModel):
     payment_type: str 
     items: list[OrderItemRead]
     model_config = {"from_attributes": True}
+
+class LoginRequest(BaseModel):
+    username: str 
+    password: str 
+
+class TokenResponse(BaseModel):
+    access_token: str 
+    token_type: str
+
+class OrderStatusUpdate(BaseModel):
+    status: str
+     

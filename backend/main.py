@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import products, orders
+from routers import products, orders, auth
 
 app = FastAPI(title="BA MENS API")
 
@@ -17,3 +17,4 @@ app.add_middleware(
 
 app.include_router(products.router)
 app.include_router(orders.router)
+app.include_router(auth.router)
