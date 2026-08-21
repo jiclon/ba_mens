@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>BA MENS — заказы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@200;400;800&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+<!-- ЭКРАН ВХОДА -->
+<section class="login" id="loginScreen">
+  <div class="login__box">
+    <p class="login__eyebrow">BA MENS</p>
+    <h1 class="login__title">Заказы</h1>
+
+    <label class="field">
+      <span class="field__label">Логин</span>
+      <input type="text" id="loginInput" autocomplete="username" spellcheck="false">
+    </label>
+
+    <label class="field">
+      <span class="field__label">Пароль</span>
+      <input type="password" id="passwordInput" autocomplete="current-password">
+    </label>
+
+    <p class="login__error" id="loginError"></p>
+
+    <button class="btn btn--solid" id="loginBtn">Войти</button>
+  </div>
+</section>
+
+<!-- ПАНЕЛЬ -->
+<div class="panel" id="panelScreen" hidden>
+
+  <header class="topbar">
+    <div class="topbar__left">
+      <span class="topbar__brand">BA MENS</span>
+      <span class="topbar__section">заказы</span>
+    </div>
+    <div class="topbar__right">
+      <button class="btn btn--ghost" id="refreshBtn">Обновить</button>
+      <button class="btn btn--ghost" id="logoutBtn">Выйти</button>
+    </div>
+  </header>
+
+  <nav class="filters" id="filters">
+    <button class="filters__item is-active" data-status="all">Все<span class="filters__count" data-count="all">0</span></button>
+    <button class="filters__item" data-status="new">Новые<span class="filters__count" data-count="new">0</span></button>
+    <button class="filters__item" data-status="in_progress">В работе<span class="filters__count" data-count="in_progress">0</span></button>
+    <button class="filters__item" data-status="done">Доставлены<span class="filters__count" data-count="done">0</span></button>
+    <button class="filters__item" data-status="canceled">Отменены<span class="filters__count" data-count="canceled">0</span></button>
+  </nav>
+
+  <main class="list" id="list"></main>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/admin.js"></script>
+</body>
+</html>
