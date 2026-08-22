@@ -40,13 +40,18 @@
   <header class="topbar">
     <div class="topbar__left">
       <span class="topbar__brand">BA MENS</span>
-      <span class="topbar__section">заказы</span>
+      <nav class="tabs" id="tabs">
+        <button class="tabs__item is-active" data-view="orders">Заказы</button>
+        <button class="tabs__item" data-view="products">Товары</button>
+      </nav>
     </div>
     <div class="topbar__right">
       <button class="btn btn--ghost" id="refreshBtn">Обновить</button>
       <button class="btn btn--ghost" id="logoutBtn">Выйти</button>
     </div>
   </header>
+
+  <div class="view" id="viewOrders">
 
   <nav class="filters" id="filters">
     <button class="filters__item is-active" data-status="all">Все<span class="filters__count" data-count="all">0</span></button>
@@ -57,6 +62,33 @@
   </nav>
 
   <main class="list" id="list"></main>
+  </div>
+
+  <!-- ТОВАРЫ -->
+  <div class="view" id="viewProducts" hidden>
+    <main class="list">
+
+      <section class="upload" id="uploadZone">
+        <input type="file" id="fileInput" accept=".xlsx" hidden>
+        <div class="upload__icon">+</div>
+        <p class="upload__title">Загрузить каталог</p>
+        <p class="upload__hint">Перетащите файл Excel сюда или нажмите, чтобы выбрать</p>
+        <button class="btn btn--solid upload__btn" id="pickFileBtn">Выбрать файл</button>
+        <p class="upload__note">Формат .xlsx · один товар в строке · данные с шестой строки</p>
+      </section>
+
+      <section class="result" id="uploadResult" hidden></section>
+
+      <section class="products" id="productsBlock">
+        <div class="products__head">
+          <h2 class="products__title">В каталоге<span class="products__count" id="productsCount">0</span></h2>
+          <button class="btn btn--ghost" id="reloadProductsBtn">Обновить</button>
+        </div>
+        <div class="products__list" id="productsList"></div>
+      </section>
+
+    </main>
+  </div>
 
 </div>
 

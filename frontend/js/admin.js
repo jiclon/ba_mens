@@ -37,7 +37,17 @@ const el = {
   refreshBtn:  document.getElementById('refreshBtn'),
   filters:     document.getElementById('filters'),
   list:        document.getElementById('list'),
-  toast:       document.getElementById('toast')
+  toast:       document.getElementById('toast'),
+  tabs:        document.getElementById('tabs'),
+  viewOrders:  document.getElementById('viewOrders'),
+  viewProducts:document.getElementById('viewProducts'),
+  uploadZone:  document.getElementById('uploadZone'),
+  fileInput:   document.getElementById('fileInput'),
+  pickFileBtn: document.getElementById('pickFileBtn'),
+  uploadResult:document.getElementById('uploadResult'),
+  productsList:document.getElementById('productsList'),
+  productsCount:document.getElementById('productsCount'),
+  reloadProducts:document.getElementById('reloadProductsBtn')
 };
 
 /* ---------- токен ---------- */
@@ -332,6 +342,142 @@ function render() {
   el.list.innerHTML = visible.map(renderOrder).join('');
 }
 
+/* ---------- вкладки ---------- */
+
+function switchView(view) {
+  el.viewOrders.hidden = view !== 'orders';
+  el.viewProducts.hidden = view !== 'products';
+  el.filters.hidden = view !== 'orders';
+  el.tabs.querySelectorAll('.tabs__item').forEach(b => {
+    b.classList.toggle('is-active', b.dataset.view === view);
+  });
+  window.scrollTo(0, 0);
+  if (view === 'products') renderProducts();
+}
+
+/* ---------- список товаров ---------- */
+
+function renderProducts() {
+  const list = Object.values(productsById);
+  el.productsCount.textContent = list.length;
+
+  if (!list.length) {
+    el.productsList.innerHTML = '<div class="state">Каталог пуст</div>';
+    return;
+  }
+
+  list.sort((a, b) => b.id - a.id);
+
+  el.productsList.innerHTML = list.map(p => {
+    const thumb = p.image
+      ? '<img class="product__thumb" src="' + escapeHtml(p.image) + '" alt="" loading="lazy">'
+      : '<div class="product__thumb"></div>';
+    const stock = p.in_stock !== false
+      ? '<span class="product__stock product__stock--in">В наличии</span>'
+      : '<span class="product__stock product__stock--out">Под заказ</span>';
+
+    return '<div class="product">' + thumb +
+      '<div class="product__info">' +
+        '<div class="product__brand">' + escapeHtml(p.brand) + '</div>' +
+        '<div class="product__name">' + escapeHtml(p.name) + '</div>' +
+      '</div>' +
+      '<div class="product__meta">' +
+        '<span class="product__price">' + formatPrice(p.price) + '</span>' + stock +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+/* ---------- загрузка каталога ---------- */
+
+async function uploadFile(file) {
+  if (!file) return;
+
+  if (!file.name.toLowerCase().endsWith('.xlsx')) {
+    toast('Нужен файл Excel с расширением .xlsx');
+    return;
+  }
+
+  const token = getToken();
+  if (!token) return logout();
+
+  el.uploadZone.classList.add('is-busy');
+  el.uploadResult.hidden = true;
+
+  const form = new FormData();
+  form.append('file', file);
+
+  try {
+    const res = await fetch(API + '/products/import', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: form
+    });
+
+    if (res.status === 401) {
+      logout();
+      toast('Вход истёк, войдите заново');
+      return;
+    }
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      showResult({ fail: true, message: (data && data.detail) || ('Ошибка ' + res.status) });
+      return;
+    }
+
+    showResult(data);
+    await loadProducts();
+    renderProducts();
+
+  } catch (e) {
+    showResult({ fail: true, message: 'Нет связи с сервером' });
+  } finally {
+    el.uploadZone.classList.remove('is-busy');
+    el.fileInput.value = '';
+  }
+}
+
+function showResult(data) {
+  el.uploadResult.hidden = false;
+
+  if (data.fail) {
+    el.uploadResult.className = 'result result--fail';
+    el.uploadResult.innerHTML =
+      '<div class="result__head"><div class="result__num">!<span>не загрузилось</span></div>' +
+      '<button class="result__close" data-close-result>Закрыть</button></div>' +
+      '<div class="result__row">' + escapeHtml(data.message) + '</div>';
+    return;
+  }
+
+  const created = data.created || 0;
+  const errors = data.errors || [];
+
+  el.uploadResult.className = 'result ' + (errors.length ? 'result--warn' : 'result--ok');
+
+  let html = '<div class="result__head">' +
+    '<div class="result__num">' + created + '<span>' + wordProducts(created) + ' добавлено</span></div>' +
+    '<button class="result__close" data-close-result>Закрыть</button></div>';
+
+  if (errors.length) {
+    html += '<div class="result__errors">' +
+      '<div class="result__label">Пропущено строк: ' + errors.length + '</div>' +
+      errors.map(e => '<div class="result__row">' + escapeHtml(e) + '</div>').join('') +
+      '</div>';
+  }
+
+  el.uploadResult.innerHTML = html;
+}
+
+function wordProducts(n) {
+  const d = n % 10, dd = n % 100;
+  if (dd >= 11 && dd <= 14) return 'товаров';
+  if (d === 1) return 'товар';
+  if (d >= 2 && d <= 4) return 'товара';
+  return 'товаров';
+}
+
 /* ---------- события ---------- */
 
 el.loginBtn.addEventListener('click', login);
@@ -354,6 +500,50 @@ el.filters.addEventListener('click', e => {
   btn.classList.add('is-active');
   activeFilter = btn.dataset.status;
   render();
+});
+
+el.tabs.addEventListener('click', e => {
+  const btn = e.target.closest('.tabs__item');
+  if (btn) switchView(btn.dataset.view);
+});
+
+el.pickFileBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  el.fileInput.click();
+});
+
+el.uploadZone.addEventListener('click', () => el.fileInput.click());
+
+el.fileInput.addEventListener('change', e => uploadFile(e.target.files[0]));
+
+['dragenter', 'dragover'].forEach(evt => {
+  el.uploadZone.addEventListener(evt, e => {
+    e.preventDefault();
+    el.uploadZone.classList.add('is-over');
+  });
+});
+
+['dragleave', 'drop'].forEach(evt => {
+  el.uploadZone.addEventListener(evt, e => {
+    e.preventDefault();
+    el.uploadZone.classList.remove('is-over');
+  });
+});
+
+el.uploadZone.addEventListener('drop', e => {
+  uploadFile(e.dataTransfer.files[0]);
+});
+
+el.uploadResult.addEventListener('click', e => {
+  if (e.target.closest('[data-close-result]')) el.uploadResult.hidden = true;
+});
+
+el.reloadProducts.addEventListener('click', async () => {
+  el.reloadProducts.disabled = true;
+  await loadProducts();
+  renderProducts();
+  el.reloadProducts.disabled = false;
+  toast('Каталог обновлён');
 });
 
 el.list.addEventListener('click', e => {
