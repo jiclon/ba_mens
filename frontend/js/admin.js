@@ -24,6 +24,12 @@ let orders = [];
 let productsById = {};
 let activeFilter = 'all';
 
+/* товары: поиск, категория, сколько показано */
+const PAGE = 20;
+let productQuery = '';
+let productCat = 'all';
+let productLimit = PAGE;
+
 /* ---------- элементы ---------- */
 
 const el = {
@@ -46,6 +52,11 @@ const el = {
   pickFileBtn: document.getElementById('pickFileBtn'),
   uploadResult:document.getElementById('uploadResult'),
   productsList:document.getElementById('productsList'),
+  productSearch:document.getElementById('productSearch'),
+  searchClear: document.getElementById('searchClear'),
+  catChips:    document.getElementById('catChips'),
+  productsShown:document.getElementById('productsShown'),
+  moreProducts:document.getElementById('moreProductsBtn'),
   productsCount:document.getElementById('productsCount'),
   reloadProducts:document.getElementById('reloadProductsBtn')
 };
@@ -357,18 +368,71 @@ function switchView(view) {
 
 /* ---------- список товаров ---------- */
 
-function renderProducts() {
-  const list = Object.values(productsById);
-  el.productsCount.textContent = list.length;
+function getFilteredProducts() {
+  let list = Object.values(productsById);
 
-  if (!list.length) {
+  if (productCat !== 'all') {
+    list = list.filter(p => (p.category || 'Без категории') === productCat);
+  }
+
+  if (productQuery) {
+    const q = productQuery.toLowerCase();
+    list = list.filter(p =>
+      (p.brand + ' ' + p.name).toLowerCase().includes(q)
+    );
+  }
+
+  return list.sort((a, b) => b.id - a.id);
+}
+
+function renderChips() {
+  const cats = {};
+  Object.values(productsById).forEach(p => {
+    const c = p.category || 'Без категории';
+    cats[c] = (cats[c] || 0) + 1;
+  });
+
+  const names = Object.keys(cats).sort();
+  if (names.length < 2) { el.catChips.innerHTML = ''; return; }
+
+  const total = Object.keys(productsById).length;
+  let html = '<button class="chips__item' + (productCat === 'all' ? ' is-active' : '') +
+             '" data-cat="all">Все<span style="opacity:.55;margin-left:6px">' + total + '</span></button>';
+
+  html += names.map(c =>
+    '<button class="chips__item' + (productCat === c ? ' is-active' : '') +
+    '" data-cat="' + escapeHtml(c) + '">' + escapeHtml(c) +
+    '<span style="opacity:.55;margin-left:6px">' + cats[c] + '</span></button>'
+  ).join('');
+
+  el.catChips.innerHTML = html;
+}
+
+function renderProducts() {
+  const all = Object.keys(productsById).length;
+  el.productsCount.textContent = all;
+
+  renderChips();
+
+  const list = getFilteredProducts();
+
+  if (!all) {
     el.productsList.innerHTML = '<div class="state">Каталог пуст</div>';
+    el.productsShown.textContent = '';
+    el.moreProducts.hidden = true;
     return;
   }
 
-  list.sort((a, b) => b.id - a.id);
+  if (!list.length) {
+    el.productsList.innerHTML = '<div class="state"><strong>Ничего не нашлось</strong>Попробуйте другой запрос</div>';
+    el.productsShown.textContent = '';
+    el.moreProducts.hidden = true;
+    return;
+  }
 
-  el.productsList.innerHTML = list.map(p => {
+  const visible = list.slice(0, productLimit);
+
+  el.productsList.innerHTML = visible.map(p => {
     const thumb = p.image
       ? '<img class="product__thumb" src="' + escapeHtml(p.image) + '" alt="" loading="lazy">'
       : '<div class="product__thumb"></div>';
@@ -386,6 +450,9 @@ function renderProducts() {
       '</div>' +
     '</div>';
   }).join('');
+
+  el.productsShown.textContent = 'Показано ' + visible.length + ' из ' + list.length;
+  el.moreProducts.hidden = visible.length >= list.length;
 }
 
 /* ---------- загрузка каталога ---------- */
@@ -536,6 +603,39 @@ el.uploadZone.addEventListener('drop', e => {
 
 el.uploadResult.addEventListener('click', e => {
   if (e.target.closest('[data-close-result]')) el.uploadResult.hidden = true;
+});
+
+let searchTimer;
+el.productSearch.addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    productQuery = e.target.value.trim();
+    productLimit = PAGE;
+    el.searchClear.hidden = !productQuery;
+    renderProducts();
+  }, 200);
+});
+
+el.searchClear.addEventListener('click', () => {
+  el.productSearch.value = '';
+  productQuery = '';
+  productLimit = PAGE;
+  el.searchClear.hidden = true;
+  renderProducts();
+  el.productSearch.focus();
+});
+
+el.catChips.addEventListener('click', e => {
+  const btn = e.target.closest('.chips__item');
+  if (!btn) return;
+  productCat = btn.dataset.cat;
+  productLimit = PAGE;
+  renderProducts();
+});
+
+el.moreProducts.addEventListener('click', () => {
+  productLimit += PAGE;
+  renderProducts();
 });
 
 el.reloadProducts.addEventListener('click', async () => {

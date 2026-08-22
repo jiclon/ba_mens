@@ -17,8 +17,15 @@
   /* Полный список с сервера — не меняется после загрузки */
   let ALL = [];
 
+  /* Бренды и сколько товаров у каждого */
+  let BRANDS = [];
+  let BRAND_COUNTS = {};
+
   /* Текущее состояние фильтров */
-  const state = { cat: 'all', brand: 'all', sort: 'default' };
+  const state = { cat: 'all', brand: 'all', sort: 'default', page: 1 };
+
+  /* Сколько товаров на одной странице */
+  const PER_PAGE = 12;
 
   /* Русские подписи для категорий из базы */
   const CAT_LABEL = {
@@ -46,15 +53,48 @@
     }
   }
 
-  /* ── Кнопки брендов строятся из самих данных ─────────────── */
+  /* ── Список брендов внутри выпадающего блока ─────────────── */
+  /* Раньше все бренды выводились лентой кнопок. При сотне брендов
+     это занимало пол-экрана, поэтому теперь выпадающий список с поиском. */
   function buildBrands() {
-    const row = $('#brandRow');
-    /* Set убирает повторы: два New Balance дадут одну кнопку */
-    const brands = [...new Set(ALL.map((p) => p.brand))].sort();
+    /* считаем, сколько товаров у каждого бренда — только те, что в наличии */
+    const counts = {};
+    ALL.filter((p) => p.in_stock).forEach((p) => {
+      counts[p.brand] = (counts[p.brand] || 0) + 1;
+    });
 
-    row.innerHTML =
-      '<button class="chip chip--sm is-on" data-brand="all">Все бренды</button>' +
-      brands.map((b) => `<button class="chip chip--sm" data-brand="${b}">${b}</button>`).join('');
+    BRANDS = Object.keys(counts).sort((a, b) => a.localeCompare(b, 'ru'));
+    BRAND_COUNTS = counts;
+
+    renderBrandList('');
+  }
+
+  function renderBrandList(query) {
+    const list = $('#brandList');
+    if (!list) return;
+
+    const q = query.trim().toLowerCase();
+    const shown = q ? BRANDS.filter((b) => b.toLowerCase().includes(q)) : BRANDS;
+
+    const total = ALL.filter((p) => p.in_stock).length;
+
+    let html = `
+      <button class="pickbox__opt ${state.brand === 'all' ? 'is-on' : ''}"
+              role="option" data-brand="all">
+        <span>Все бренды</span><span class="pickbox__num">${total}</span>
+      </button>`;
+
+    if (!shown.length) {
+      html += '<p class="pickbox__empty">Такого бренда нет</p>';
+    } else {
+      html += shown.map((b) => `
+        <button class="pickbox__opt ${state.brand === b ? 'is-on' : ''}"
+                role="option" data-brand="${b}">
+          <span>${b}</span><span class="pickbox__num">${BRAND_COUNTS[b]}</span>
+        </button>`).join('');
+    }
+
+    list.innerHTML = html;
   }
 
   /* ── Фильтрация и сортировка ─────────────────────────────── */
@@ -68,8 +108,46 @@
     if (state.sort === 'rich')  list.sort((a, b) => b.price - a.price);
     if (state.sort === 'brand') list.sort((a, b) => a.brand.localeCompare(b.brand, 'ru'));
 
-    render(list);
+    /* если после смены фильтра страниц стало меньше — возвращаемся на первую */
+    const pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
+    if (state.page > pages) state.page = 1;
+
+    const from = (state.page - 1) * PER_PAGE;
+    render(list.slice(from, from + PER_PAGE));
+    renderPager(list.length, pages);
     count(list.length);
+  }
+
+  /* ── Переход по страницам ────────────────────────────────── */
+  function renderPager(total, pages) {
+    const pager = $('#pager');
+    if (!pager) return;
+
+    if (pages < 2) { pager.hidden = true; pager.innerHTML = ''; return; }
+    pager.hidden = false;
+
+    const cur = state.page;
+
+    /* какие номера показывать: первая, последняя, текущая и соседние */
+    const nums = [];
+    for (let i = 1; i <= pages; i++) {
+      if (i === 1 || i === pages || Math.abs(i - cur) <= 1) nums.push(i);
+    }
+
+    let html = `<button class="pager__arrow" data-page="${cur - 1}"
+                  ${cur === 1 ? 'disabled' : ''} aria-label="Назад">‹</button>`;
+
+    let prev = 0;
+    nums.forEach((n) => {
+      if (n - prev > 1) html += '<span class="pager__dots">…</span>';
+      html += `<button class="pager__num ${n === cur ? 'is-on' : ''}" data-page="${n}">${n}</button>`;
+      prev = n;
+    });
+
+    html += `<button class="pager__arrow" data-page="${cur + 1}"
+               ${cur === pages ? 'disabled' : ''} aria-label="Вперёд">›</button>`;
+
+    pager.innerHTML = html;
   }
 
   function count(n) {
@@ -133,18 +211,72 @@
       const btn = e.target.closest('[data-cat]');
       if (!btn) return;
       state.cat = btn.dataset.cat;
+      state.page = 1;
       $$('#catRow .chip').forEach((b) => b.classList.toggle('is-on', b === btn));
       apply();
     });
 
-    /* Бренды — слушаем контейнер, потому что кнопки создаются позже */
-    $('#brandRow').addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-brand]');
-      if (!btn) return;
-      state.brand = btn.dataset.brand;
-      $$('#brandRow .chip').forEach((b) => b.classList.toggle('is-on', b === btn));
+    /* Переход по страницам */
+    $('#pager').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-page]');
+      if (!btn || btn.disabled) return;
+
+      state.page = Number(btn.dataset.page);
+      apply();
+      scrollToGrid();
+    });
+  }
+
+  /* После смены страницы возвращаем к началу сетки, а не к самому верху */
+  function scrollToGrid() {
+    const top = $('.catbody').getBoundingClientRect().top + window.scrollY - 90;
+    window.scrollTo({ top, behavior: 'smooth' });
+  }
+
+  /* ── Выбор бренда ────────────────────────────────────────── */
+  function initBrandBox() {
+    const box    = $('#brandBox');
+    const btn    = $('#brandBtn');
+    const menu   = $('#brandMenu');
+    const val    = $('#brandVal');
+    const search = $('#brandSearch');
+    const list   = $('#brandList');
+    if (!box || !btn || !menu) return;
+
+    const close = () => {
+      box.classList.remove('is-open');
+      btn.setAttribute('aria-expanded', 'false');
+    };
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = box.classList.toggle('is-open');
+      btn.setAttribute('aria-expanded', String(open));
+      if (open) {
+        search.value = '';
+        renderBrandList('');
+        /* на телефоне клавиатура закрывает список — фокус только на широком экране */
+        if (window.innerWidth > 720) setTimeout(() => search.focus(), 60);
+      }
+    });
+
+    search.addEventListener('input', (e) => renderBrandList(e.target.value));
+    search.addEventListener('click', (e) => e.stopPropagation());
+
+    list.addEventListener('click', (e) => {
+      const opt = e.target.closest('[data-brand]');
+      if (!opt) return;
+
+      state.brand = opt.dataset.brand;
+      state.page = 1;
+      val.textContent = state.brand === 'all' ? 'Все бренды' : state.brand;
+
+      close();
       apply();
     });
+
+    document.addEventListener('click', (e) => { if (!box.contains(e.target)) close(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
   }
 
   /* ── Своя сортировка вместо системного select ────────────── */
@@ -171,6 +303,7 @@
       if (!opt) return;
 
       state.sort = opt.dataset.sort;
+      state.page = 1;
       val.textContent = opt.textContent;
 
       $$('.sortbox__opt', menu).forEach((o) => {
@@ -239,6 +372,7 @@
 
     initMenu();
     initFilters();
+    initBrandBox();
     initSort();
     initSmoothScroll();
     load();

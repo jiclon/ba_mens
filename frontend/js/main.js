@@ -9,10 +9,15 @@
 
   /* ── Адрес бэкенда ───────────────────────────────────────── */
   /* Локально — твой uvicorn. После деплоя заменить на боевой адрес. */
-  const API_URL = 'https://ba-mens.onrender.com';
+  const API_URL = 'http://127.0.0.1:8000';
 
   /* Заполнится после ответа сервера */
   let PRODUCTS = [];
+
+  /* Сколько карточек показывать на главной.
+     Главная — витрина, а не склад: весь список живёт в каталоге.
+     Кратно четырём, потому что на широком экране четыре в ряд. */
+  const SHOW_ON_HOME = 8;
 
   const BRANDS = ['Nike', 'Tommy Hilfiger', 'New Balance', 'Reebok', 'Stüssy', 'Creed', 'Dior', 'Tom Ford', 'Chanel', 'Givenchy'];
 
@@ -34,6 +39,9 @@
       const data = await res.json();
       /* Показываем только то, что есть в наличии */
       PRODUCTS = data.filter((p) => p.in_stock);
+
+      /* Новые сверху: id растёт при добавлении, значит больший id — свежее */
+      PRODUCTS.sort((a, b) => b.id - a.id);
 
       if (!PRODUCTS.length) {
         if (grid) grid.innerHTML = '<p class="grid__state">Пока пусто — скоро завезём</p>';
@@ -74,7 +82,10 @@
     const grid = $('#grid');
     if (!grid) return;
 
-    grid.innerHTML = PRODUCTS.map((p) => `
+    /* На главной только первые несколько, остальные — в каталоге */
+    const shown = PRODUCTS.slice(0, SHOW_ON_HOME);
+
+    grid.innerHTML = shown.map((p) => `
       <a class="card" href="product.html?id=${p.id}" data-reveal>
         <div class="card__frame">
           <img src="${p.image || 'images/p-nike.jpg'}" alt="${p.brand} ${p.name}" loading="lazy" />
@@ -92,6 +103,25 @@
           </div>
         </div>
       </a>`).join('');
+
+    updateMoreLink();
+  }
+
+  /* Подпись на кнопке под сеткой: сколько всего товаров в каталоге */
+  function updateMoreLink() {
+    const link = $('#allLink');
+    if (!link) return;
+
+    const n = PRODUCTS.length;
+    if (n <= SHOW_ON_HOME) {
+      link.textContent = 'Смотреть каталог';
+      return;
+    }
+
+    const word = n % 10 === 1 && n % 100 !== 11 ? 'товар'
+               : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'товара'
+               : 'товаров';
+    link.textContent = `Смотреть все ${n} ${word}`;
   }
 
   /* ── Бегущая строка брендов ──────────────────────────────── */

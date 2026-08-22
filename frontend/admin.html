@@ -40,11 +40,12 @@
   <header class="topbar">
     <div class="topbar__left">
       <span class="topbar__brand">BA MENS</span>
-      <nav class="tabs" id="tabs">
-        <button class="tabs__item is-active" data-view="orders">Заказы</button>
-        <button class="tabs__item" data-view="products">Товары</button>
-      </nav>
     </div>
+
+    <nav class="tabs" id="tabs">
+      <button class="tabs__item is-active" data-view="orders">Заказы</button>
+      <button class="tabs__item" data-view="products">Товары</button>
+    </nav>
     <div class="topbar__right">
       <button class="btn btn--ghost" id="refreshBtn">Обновить</button>
       <button class="btn btn--ghost" id="logoutBtn">Выйти</button>
@@ -84,7 +85,21 @@
           <h2 class="products__title">В каталоге<span class="products__count" id="productsCount">0</span></h2>
           <button class="btn btn--ghost" id="reloadProductsBtn">Обновить</button>
         </div>
+
+        <div class="search">
+          <input type="search" class="search__input" id="productSearch"
+                 placeholder="Поиск по бренду или названию" autocomplete="off" spellcheck="false">
+          <button class="search__clear" id="searchClear" hidden>Сбросить</button>
+        </div>
+
+        <nav class="chips" id="catChips"></nav>
+
         <div class="products__list" id="productsList"></div>
+
+        <div class="products__more">
+          <span class="products__shown" id="productsShown"></span>
+          <button class="btn btn--ghost" id="moreProductsBtn" hidden>Показать ещё</button>
+        </div>
       </section>
 
     </main>

@@ -84,8 +84,20 @@
         </div>
 
         <div class="filters__line">
-          <!-- Бренды подставятся из данных -->
-          <div class="filters__row filters__row--brands" id="brandRow"></div>
+          <!-- Бренд: выпадающий список с поиском вместо длинной ленты -->
+          <div class="pickbox" id="brandBox">
+            <button class="pickbox__btn" id="brandBtn" aria-haspopup="listbox" aria-expanded="false">
+              <span class="pickbox__label">Бренд</span>
+              <span class="pickbox__val" id="brandVal">Все бренды</span>
+              <span class="pickbox__arrow" aria-hidden="true"></span>
+            </button>
+
+            <div class="pickbox__menu" id="brandMenu">
+              <input type="search" class="pickbox__search" id="brandSearch"
+                     placeholder="Найти бренд" autocomplete="off" spellcheck="false">
+              <div class="pickbox__list" id="brandList" role="listbox" aria-label="Бренды"></div>
+            </div>
+          </div>
 
           <!-- Сортировка: своя, вместо системного select -->
           <div class="sortbox" id="sortBox">
@@ -106,6 +118,8 @@
       </div>
 
       <div class="shelf__grid" id="catGrid"></div>
+
+      <nav class="pager" id="pager" aria-label="Страницы каталога" hidden></nav>
 
     </div>
   </section>
@@ -148,6 +162,5 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lenis/1.1.13/lenis.min.js"></script>
 <script src="js/catalog.js"></script>
-<script src="js/cart.js"></script>
 </body>
 </html>
